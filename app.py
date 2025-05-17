@@ -7,7 +7,19 @@ import logging
 import sys
 import os
 from dotenv import load_dotenv
+from flask import Flask
+import threading
 load_dotenv() 
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Bot is running."
+
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 3000))
+    app.run(host="0.0.0.0", port=port)
 
 # Configure logging to output to stdout
 logging.basicConfig(
@@ -38,7 +50,7 @@ def send_email(subject, body, to_email):
 # ==== Exam checking function ====
 def check_exam_schedule():
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
+        browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
         page = browser.new_page()
 
         try:
@@ -97,11 +109,18 @@ def check_exam_schedule():
         finally:
             browser.close()
 
-# ==== Run check every 5 minutes ====
+# ==== Run check every 1 hours ====
 if __name__ == "__main__":
-    while True:
-        found = check_exam_schedule()
-        if found:
-            break
-        log('restart...')
-        time.sleep(3600)  # wait 5 minutes
+    threading.Thread(target=run_dummy_server).start()
+    
+    try:
+        while True:
+            found = check_exam_schedule()
+            if found:
+                break
+            log('restart...')
+            time.sleep(3600)
+    except Exception as e:
+        log(f"❌ Uncaught error: {e}")
+        time.sleep(60)  # Retry after 1 minutes
+
